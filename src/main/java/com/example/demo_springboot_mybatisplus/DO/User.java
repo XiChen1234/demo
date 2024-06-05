@@ -12,7 +12,7 @@ import lombok.Data;
 @TableName("user")
 public class User {
     @TableId("id") // 表id的注解，映射不一致时写入
-    private Integer user_id;
+    private Integer id;
     @TableField("name") // 字段value，映射不一致时写入
     private String username;
     private Integer age;

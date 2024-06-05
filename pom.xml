@@ -3,10 +3,10 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
-    <artifactId>demo_SpringBoot_MyBatisPlus</artifactId>
+    <artifactId>demo</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>demo_SpringBoot_MyBatisPlus</name>
-    <description>demo_SpringBoot_MyBatisPlus</description>
+    <name>demo</name>
+    <description>SpringBoot_MyBatisPlus_demo</description>
     <properties>
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

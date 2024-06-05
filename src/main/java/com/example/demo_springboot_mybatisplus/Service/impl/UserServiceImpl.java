@@ -22,6 +22,7 @@ public class UserServiceImpl implements UserService {
         queryWrapper.lambda()
                 .eq(User::getUsername, username)
                 .eq(User::getEmail, email);
+        System.out.println(userMapper.selectOne(queryWrapper).getId());
         return userMapper.selectOne(queryWrapper);
     }
 }

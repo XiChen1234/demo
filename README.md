@@ -8,7 +8,7 @@
 ### 版本信息
 - JDK: `1.8`
 - Spring Boot: `2.6.13`
-- mysql-connector-jave: `8.0.31`
+- mysql-connector-java: `8.0.31`
 - **MyBatis Plus**: `3.5.6`
 
 ### 引入Maven依赖
@@ -91,7 +91,7 @@ spring:
 @TableName("user")
 public class User {
     @TableId("id") // 表id的注解，映射不一致时写入
-    private Integer user_id;
+    private Integer id;
     @TableField("name") // 字段value，映射不一致时写入
     private String username;
     private Integer age;
