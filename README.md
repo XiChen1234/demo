@@ -3,6 +3,7 @@
 
 ## 项目目录（分支）：
 - SpringBoot_MybatisPlus_demo: [Spring Boot集成MyBatis Plus项目示例](./SpringBoot_MybatisPlus_demo/README.md)
+- CommonResponse_demo: [通用响应类的设计与使用](./CommonResponse_demo/README.md)
 
 ## 操作方式：
 1. 将仓库整个克隆下来
@@ -12,5 +13,6 @@ git clone https://github.com/XiChen1234/demo.git
 
 2. 根据需要切换到不同的项目分支上，根据项目README.md文档进行学习和实践
 ```bash
-git checkout SpringBoot_MybatisPlus_demo
+# 分支名替换为具体项目的分支
+git checkout [分支名]
 ```
