@@ -1,175 +1,210 @@
-# Spring Boot集成MyBatis Plus项目示例
-> 该项目旨在整合我在写技术博客的过程中，所演示的demo项目，仅供个人学习、复习使用，不建议直接用在生产环境中
+# 通用响应类的设计与使用
 
-目前所接触到的大多数项目都是通过Spring Boot快速搭建，敏捷开发的，并且Maven导入的方式也非常方便，所以这个方法是最常用的方法
+## 为什么要做通用响应类设计？
 
-## 导入过程
+因为在前后端分离的大环境下，后端无法像以前那样只用针对于网页端，将数据渲染成完善的 html 网页之后直接返回给客户端进行展示了，在多种多样的客户端环境中，后端选择直接将数据根据某种格式（前后端交互通常使用 JSON 格式）打包好发送给前端，将页面具体如何渲染的权利交给前端进行，以此降低项目耦合度；同时，使用前后端分离的架构分工明确，前端专心处理用户逻辑，后端专心处理数据格式，以此实现项目分工合作进行开发，提高开发效率
 
-### 版本信息
-- JDK: `1.8`
-- Spring Boot: `2.6.13`
-- mysql-connector-java: `8.0.31`
-- **MyBatis Plus**: `3.5.6`
+但是，后端的数据结构往往是多种多样的，比如某个用户对象，再比如一个用户信息列表，亦或是一个简单的字符串……非常繁杂。因此，在处理前后端交互的数据的时候，为保证前后端通信顺畅，需要约定相互交流的格式。于是通用响应类接管了所有响应并将数据封装到响应中
 
-### 引入Maven依赖
-在Spring Boot项目中的pom.xml文件中添加MyBatis Plus及MySQL数据库的依赖，为了后面简化DO对象的编写，也引入lombok的依赖
-```xml
-<!-- mysql -->
-<dependency>
-    <groupId>mysql</groupId>
-    <artifactId>mysql-connector-java</artifactId>
-</dependency>
-<!-- mybatis-plus -->
-<dependency>
-    <groupId>com.baomidou</groupId>
-    <artifactId>mybatis-plus-boot-starter</artifactId>
-    <version>3.5.6</version>
-</dependency>
+## 通用响应类设计的具体实现
 
+我进行通用响应类的设计过程中，将通用响应类设计为了以下三种情形：
 
-<!-- lombok -->
-<dependency>
-    <groupId>org.projectlombok</groupId>
-    <artifactId>lombok</artifactId>
-    <optional>true</optional>
-</dependency>
-```
+- 成功响应（SUCCESS）：能够给客户端提供数据
+- 警告响应（WARNING）：一般为客户端方面的错误，包含语法错误或因客户端原因无法完成请求，比如在参数校验过程中发现的参数错误
+- 异常响应（ERROR）：服务器内部错误，在处理请求的过程中发生了错误，需要执行异常处理相关操作
 
-### 数据库初始化
-在MySQL中创建新的数据库，并导入部分示例数据：  
-| id  | name   | age | email              |
-| --- | ------ | --- | ------------------ |
-| 1   | Jone   | 18  | test1@baomidou.com |
-| 2   | Jack   | 20  | test2@baomidou.com |
-| 3   | Tom    | 28  | test3@baomidou.com |
-| 4   | Sandy  | 21  | test4@baomidou.com |
-| 5   | Billie | 24  | test5@baomidou.com |
+基于上面三种场景对通用响应类的规范进行约定：成功响应携带状态码、数据，或者状态码、信息；警告和异常响应携带状态码、错误信息。
 
-sql语句如下：
-```sql
--- 数据库表结构
-DROP TABLE IF EXISTS `user`;
+同时，为了扩展响应码和异常种类，我编写了响应码枚举类，在其中可以随意添加自定义的响应码（这部分在统一异常处理的文章中再进行规范扩展）
 
-CREATE TABLE `user`
-(
-    id BIGINT NOT NULL COMMENT '主键ID',
-    name VARCHAR(30) NULL DEFAULT NULL COMMENT '姓名',
-    age INT NULL DEFAULT NULL COMMENT '年龄',
-    email VARCHAR(50) NULL DEFAULT NULL COMMENT '邮箱',
-    PRIMARY KEY (id)
-);
+### 响应码枚举类
 
--- 数据库数据
-DELETE FROM `user`;
+该类列举了项目当中需要用到的所有响应码，包括常规的成功（200）、警告（400）和异常（500），以及在项目中可以进行自定义的其他异常。
 
-INSERT INTO `user` (id, name, age, email) VALUES
-(1, 'Jone', 18, 'test1@baomidou.com'),
-(2, 'Jack', 20, 'test2@baomidou.com'),
-(3, 'Tom', 28, 'test3@baomidou.com'),
-(4, 'Sandy', 21, 'test4@baomidou.com'),
-(5, 'Billie', 24, 'test5@baomidou.com');
-```
+成功为正常状态下的响应；警告为不影响服务端运行的客户端，同时为未进行自定义的异常提供兜底；错误为影响服务端运行的异常，以及为其他开发过程中未考虑的所有异常进行兜底和处理
 
-### 项目配置
-在项目中的application.yml配置文件中设置数据库连接配置
-```yaml
-spring:
-  datasource:
-    username: root
-    password: 123456
-    url: jdbc:mysql://127.0.0.1:3306/demo
-    driver-class-name: com.mysql.cj.jdbc.Driver
-```
-
-### 创建数据库DO对象
-创建数据库DO对象，注意，该对象为业务层与数据库之间进行数据传输的对象，基本要与数据库中的字段内容一致
 ```java
 /**
- * @Description 用户，数据库DO对象，与数据库表一一对应
+ * @Description 响应码枚举类
+ * 枚举项目中所用到的所有响应码
  */
-@Data
-@TableName("user")
-public class User {
-    @TableId("id") // 表id的注解，映射不一致时写入
-    private Integer id;
-    @TableField("name") // 字段value，映射不一致时写入
-    private String username;
-    private Integer age;
-    private String email;
-}
-```
+@Getter
+public enum ResponseCode {
+    SUCCESS(200, "SUCCESS"),
+    WARNING(400, "WARNING"),
+    ERROR(500, "ERROR"),
 
-### 添加Mapper层
-添加Mapper层，mapper接口直接集成BaseMapper并对应一个DO对象。BaseMapper接口提供了多种操作数据库的方法，可以直接在上层依赖注入后调用接口方法。也可以在其中自定义操作语句，本文较为基础，因此该扩展略。
-```java
-/**
- * @Description 数据库接口层，用于操作user表的接口类
- */
-@Mapper
-public interface UserMapper extends BaseMapper<User> {
-}
-```
+    // 在这之后可以添加自定义响应码，一般为自定义异常响应码
+    LOGIN_EMPTY(1000, "登录表单提交为空"),
+    LOGIN_ERROR(1001, "登录表单验证失败");
 
-如果不在Mapper接口上面添加@Mapper，则需要在启动类中添加Mapper的扫描文件地址才能生效：`@MapperScan("com.example.项目名.mapper")`，每个项目具体地址不一样
+    private final Integer code;
+    private final String message;
 
-### 添加Service层与Controller层
-根据业务逻辑，添加Service层和Controller层即可，这里以条件查询用户为例子
-
-service层：
-```java
-/**
- * @Description 用户业务接口
- */
-public interface UserService {
-    public User getUserByUsernameAndEmail(String username, String email);
-}
-
-/**
- * @Description 用户业务接口的具体实现
- */
-@Service
-public class UserServiceImpl implements UserService {
-    @Resource
-    private UserMapper userMapper;
-
-    @Override
-    public User getUserByUsernameAndEmail(String username, String email) {
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.lambda()
-                .eq(User::getUsername, username)
-                .eq(User::getEmail, email);
-        return userMapper.selectOne(queryWrapper);
+    ResponseCode(Integer code, String message) {
+        this.code = code;
+        this.message = message;
     }
 }
 ```
 
-controller层
+在响应码枚举中可以增加新的响应码，但在这里暂且按下不表，异常响应码的扩展放在统一异常处理的文章中再说
+
+### 通用响应码结构
+
+该类能够保证响应的基本结构为 JSON 格式，并且包含：status、message、data 三个自选大模块，在类内部，构造方法可以根据传参不同创建通用响应类。
+
+但是由于为了适配多种多样的业务数据，data 为泛型，因此需要将构造方法设置为 private，并提供与之配套的创造方法来内部返回创建新的响应类，通过不同的方法创建不同的响应类，来避免歧义。
+
+最后，该类还提供了自定义异常的创建方法（但在本篇中未提及）。这些和上面一样在统一异常处理的文章中进行阐述。
+
 ```java
 /**
- * @Description 用户接口层，包含用户相关操作
+ * @Description 通用响应类结构
  */
-@RestController
-public class UserController {
-    @Resource
-    private UserService userService;
+@Getter
+@JsonInclude(JsonInclude.Include.NON_NULL) // 空数据不包含
+public class CommonResponse<T> {
+    private final Integer code;
+    private String message;
+    private T data;
 
-    @GetMapping("/get")
-    public User getUser(@RequestParam String username, @RequestParam String email) {
-        return userService.getUserByUsernameAndEmail(username, email);
+    // 私有构造方法
+    private CommonResponse(Integer code) {
+        this.code = code;
+    }
+
+    private CommonResponse(Integer code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    private CommonResponse(Integer code, String message, T data) {
+        this.code = code;
+        this.message = message;
+        this.data = data;
+    }
+
+    /**
+     * 创建成功响应方法
+     *
+     * @return 成功响应
+     */
+    public static <T> CommonResponse<T> creatForSuccess() {
+        return new CommonResponse<>(ResponseCode.SUCCESS.getCode());
+    }
+
+    /**
+     * 创建成功响应方法
+     *
+     * @param message 成功自定义信息
+     * @return 成功响应
+     */
+    public static <T> CommonResponse<T> creatForSuccessMessage(String message) {
+        return new CommonResponse<>(ResponseCode.SUCCESS.getCode(), message);
+    }
+
+    /**
+     * 创建成功响应方法
+     *
+     * @param data 响应数据
+     * @return 成功响应
+     */
+    public static <T> CommonResponse<T> creatForSuccessData(T data) {
+        return new CommonResponse<>(ResponseCode.SUCCESS.getCode(), ResponseCode.SUCCESS.getMessage(), data);
+    }
+
+    /**
+     * 创建成功响应方法
+     *
+     * @param message 成功自定义信息
+     * @param data    响应数据
+     * @return 成功响应
+     */
+    public static <T> CommonResponse<T> creatForSuccessMessageData(String message, T data) {
+        return new CommonResponse<>(ResponseCode.SUCCESS.getCode(), message, data);
+    }
+
+    /**
+     * 创建警告响应方法
+     *
+     * @return 异常响应
+     */
+    public static <T> CommonResponse<T> creatForWarning() {
+        return new CommonResponse<>(ResponseCode.WARNING.getCode());
+    }
+
+    /**
+     * 创建警告响应方法
+     *
+     * @param message 警告自定义信息
+     * @return 异常响应
+     */
+    public static <T> CommonResponse<T> creatForWarningMessage(String message) {
+        return new CommonResponse<>(ResponseCode.WARNING.getCode(), message);
+    }
+
+    /**
+     * 创建错误响应方法
+     *
+     * @return 错误响应
+     */
+    public static <T> CommonResponse<T> creatForError() {
+        return new CommonResponse<>(ResponseCode.ERROR.getCode());
+    }
+
+    /**
+     * 创建错误响应方法
+     *
+     * @param message 错误自定义信息
+     * @return 错误响应
+     */
+    public static <T> CommonResponse<T> creatForErrorMessage(String message) {
+        return new CommonResponse<>(ResponseCode.ERROR.getCode(), message);
     }
 }
 ```
 
-随后访问：http://localhost:8080/get?username=Jack&email=test2@baomidou.com，若浏览器出现数据，则证明引入过程成功！
-```json
-{
-  "user_id": null,
-  "username": "Jack",
-  "age": 20,
-  "email": "test2@baomidou.com"
+## 通用响应类的使用
+
+在项目基本 MVC 三层结构中，通常在 Service 层中处理数据的处理和封装工作，完成后将完整的数据传递到 Controller 层中，并由 Controller 层发往前端。此时就需要通用响应类将数据进行封装，具体使用示例如下：
+
+```java
+/**
+ * 三种通用响应类型
+ *
+ * @param type 类型
+ *             success：成功200
+ *             warning：警告400
+ *             error：错误500
+ * @return 通用响应类
+ */
+@GetMapping("/common/{type}")
+public CommonResponse<String> response(@PathVariable String type) {
+    if (Objects.equals(type, "success")) {
+        return CommonResponse.creatForSuccessData("my data is here");
+    }
+
+    if (Objects.equals(type, "warning")) {
+        return CommonResponse.creatForWarning();
+    }
+
+    if (Objects.equals(type, "error")) {
+        return CommonResponse.creatForErrorMessage("服务器错误");
+    }
+
+    return CommonResponse.creatForWarningMessage("参数判断错误");
 }
 ```
 
-## 总结
-通过以上几个简单的步骤，我们就实现了 User 表的 CRUD 功能，甚至连 XML 文件都不用编写！  
-从以上步骤中，我们可以看到集成 MyBatis-Plus 非常的简单，只需要引入 starter 依赖，简单进行配置即可使用。
+各种 if 条件判断模拟 Controller 层对具体的业务模块流程的控制，在得到指定流程的结果后，将其封装进行返回。
+
+- 访问：[http://localhost:8099/common/success](http://localhost:8099/common/success)，得到 `{"code":200,"message":"SUCCESS","data":"my data is here"}`（data 可以有更复杂的格式）
+- 访问：[http://localhost:8099/common/warning](http://localhost:8099/common/success)，得到 `{"code":400}`
+- 访问：[http://localhost:8099/common/error](http://localhost:8099/common/success)，得到 `{"code":500,"message":"服务器错误"}`
+- 访问：[http://localhost:8099/common/%&saj12a](http://localhost:8099/common/success)，得到 `{"code":400,"message":"参数判断错误"}`
+
+随后将 json 字符串反序列化后即可在前端进行对应的处理
+
+至此，通用响应类的设计已经结束了。但是该模块仍有部分概念存在缺失，如自定义异常的状态码和处理方式的不足，更多内容在统一异常处理的文章中进行阐述，敬请期待
